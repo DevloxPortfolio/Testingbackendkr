@@ -9,17 +9,12 @@ require('dotenv').config(); // Load environment variables
 
 const app = express();
 const dbURI = process.env.MONGODB_URI; // Use environment variable for MongoDB URI
-const port = process.env.PORT || 3000; // Use environment variable for port or default to 3000
 
 // Check for MongoDB URI
 if (!dbURI) {
   console.error('Missing MongoDB URI');
   process.exit(1);
 }
-
-app.get("/", (req, res) => {
-  res.json("hello");
-});
 
 // Connect to MongoDB
 mongoose.connect(dbURI)
@@ -46,7 +41,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}/`);
-});
+// Export the app as a serverless function
+module.exports = (req, res) => {
+  app(req, res);
+};
