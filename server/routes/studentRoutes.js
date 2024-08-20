@@ -66,10 +66,10 @@ router.post('/upload', upload.single('excelFile'), async (req, res) => {
       const workbook = XLSX.read(data.Body, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      // const data = XLSX.utils.sheet_to_json(worksheet);
+      const excelData = XLSX.utils.sheet_to_json(worksheet);  // Convert sheet to JSON
 
       // Trim whitespace from data
-      const trimmedData = data.map(trimObjectValues);
+      const trimmedData = excelData.map(trimObjectValues);
 
       let processedCount = 0;
       let duplicateCount = 0;
