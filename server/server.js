@@ -65,6 +65,8 @@ app.get('/db-status', async (req, res) => {
 // Basic route
 app.get("/", (req, res) => {
   res.json("Hello, welcome to the server!");
+  console.error("Hello, welcome to the server!");
+
 });
 
 // File upload route
@@ -99,3 +101,5 @@ console.log('AWS Access Key ID:', process.env.AWS_ACCESS_KEY_ID);
 console.log('AWS Secret Access Key:', process.env.AWS_SECRET_ACCESS_KEY);
 console.log('AWS Region:', process.env.AWS_REGION);
 console.log('S3 Bucket:', process.env.S3_BUCKET);
+console.log('Mongodb url:', process.env.MONGODB_URI);
+
