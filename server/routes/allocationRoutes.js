@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 // Import the models
 const Student = require('../models/student');
 const Bus = require('../models/bus');
-const Stop = require('../models/stop');
+const Stop = require('../models/stop.js');
 
 // Bus allocation route
 router.get('/students-with-buses', async (req, res) => {
