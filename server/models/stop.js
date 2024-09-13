@@ -1,11 +1,9 @@
-// server/models/Stop.js
-
 const mongoose = require('mongoose');
 
 const stopSchema = new mongoose.Schema({
-  srno: { type: Number, required: true },
-  code: { type: String, required: true },
-  stopname: { type: String, required: true },
+  code: String,
+  stopname: String
 });
 
-module.exports = mongoose.model('Stop', stopSchema);
+// Export the model with the collection name 'stops'
+module.exports = mongoose.model('Stop', stopSchema, 'stops');
