@@ -1,119 +1,103 @@
 const express = require('express');
 const multer = require('multer');
-const multerS3 = require('multer-s3');
-const AWS = require('aws-sdk');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const XLSX = require('xlsx');
-const Student = require('../models/student');
-
-// Initialize AWS S3
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION
-});
-
-const s3 = new AWS.S3();
+const Student = require('../models/student'); // Update with your actual path
 
 const router = express.Router();
 
-// Configure multer to use S3
-const upload = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: process.env.S3_BUCKET,
-    acl: 'private',
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-    key: function (req, file, cb) {
-      cb(null, `uploads/${Date.now().toString()}_${file.originalname}`);
-    }
-  })
+// AWS S3 Client Initialization
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  }
 });
 
-// Function to trim whitespace from object values
+// Configure Multer for File Upload
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// Helper function to trim object values
 const trimObjectValues = (obj) => {
-  const trimmedObj = {};
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      trimmedObj[key] = typeof obj[key] === 'string' ? obj[key].trim() : obj[key];
-    }
-  }
-  return trimmedObj;
+  return Object.keys(obj).reduce((acc, key) => {
+    acc[key] = typeof obj[key] === 'string' ? obj[key].trim() : obj[key];
+    return acc;
+  }, {});
 };
 
-// Student Upload Route
+// Upload Route
 router.post('/upload', upload.single('excelFile'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
   }
 
   try {
-    // Get the S3 file URL
-    const fileUrl = req.file.location;
-
-    // Download file from S3
-    const params = {
+    // Upload file to S3
+    const uploadParams = {
       Bucket: process.env.S3_BUCKET,
-      Key: req.file.key
+      Key: `uploads/${Date.now().toString()}_${req.file.originalname}`,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
     };
 
-    s3.getObject(params, (err, data) => {
-      if (err) {
-        console.error('Error fetching file from S3:', err);
-        return res.status(500).json({ message: 'Error fetching file from S3', error: err.message });
+    const upload = new Upload({
+      client: s3,
+      params: uploadParams,
+    });
+
+    await upload.done();
+
+    // Process Excel file (after successful upload)
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const excelData = XLSX.utils.sheet_to_json(worksheet);
+
+    // Trim whitespace and process data
+    const trimmedData = excelData.map(trimObjectValues);
+
+    let processedCount = 0;
+    let duplicateCount = 0;
+
+    // Insert data into MongoDB
+    for (const record of trimmedData) {
+      const { EnrollmentCode, ...rest } = record;
+
+      if (!EnrollmentCode) {
+        continue; // Skip records without EnrollmentCode
       }
 
-      // Process the file
-      const workbook = XLSX.read(data.Body, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const excelData = XLSX.utils.sheet_to_json(worksheet);  // Convert sheet to JSON
+      const existingStudent = await Student.findOne({ EnrollmentCode });
 
-      // Trim whitespace from data
-      const trimmedData = excelData.map(trimObjectValues);
+      if (!existingStudent) {
+        await Student.create(record);
+        processedCount++;
+      } else {
+        duplicateCount++;
+      }
+    }
 
-      let processedCount = 0;
-      let duplicateCount = 0;
-
-      // Process and insert data into MongoDB
-      (async () => {
-        for (const record of trimmedData) {
-          const { EnrollmentCode, ...rest } = record;
-          if (!EnrollmentCode) {
-            // Skip records without EnrollmentCode
-            continue;
-          }
-
-          // Check for duplicates and insert data
-          const existingStudent = await Student.findOne({ EnrollmentCode });
-          if (!existingStudent) {
-            await Student.create(record);
-            processedCount++;
-          } else {
-            duplicateCount++;
-          }
-        }
-
-        res.status(200).json({
-          message: 'File processed successfully',
-          processedCount,
-          duplicateCount
-        });
-      })();
-
+    res.status(200).json({
+      message: 'File processed successfully',
+      processedCount,
+      duplicateCount,
     });
+
   } catch (error) {
     console.error('Error processing file:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Error processing file', error: error.message });
   }
 });
 
+// Fetch All Students
 router.get('/students', async (req, res) => {
   try {
-    const students = await Student.find(); // Fetch all students from MongoDB
-    console.log(`Found ${students.length} students.`);
+    const students = await Student.find();
     res.status(200).json(students);
   } catch (error) {
-    console.error('Error fetching students:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
