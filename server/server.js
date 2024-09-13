@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
-const AWS = require('@aws-sdk/client-s3');
+const { S3Client } = require('@aws-sdk/client-s3');
 require('dotenv').config(); // Load environment variables
 
 const app = express();
@@ -11,7 +11,7 @@ const dbURI = process.env.MONGODB_URI; // Use environment variable for MongoDB U
 const port = process.env.PORT || 3000; // Use environment variable for port or default to 3000
 
 // AWS S3 Configuration
-const s3 = new AWS.S3({
+const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -29,7 +29,7 @@ const upload = multer({
       cb(null, { fieldName: file.fieldname });
     },
     key: (req, file, cb) => {
-      cb(null, Date.now().toString() + '-' + file.originalname);
+      cb(null, `${Date.now().toString()}-${file.originalname}`);
     }
   })
 });
@@ -65,21 +65,18 @@ app.get('/db-status', async (req, res) => {
 // Basic route
 app.get("/", (req, res) => {
   res.json("Hello, welcome to the server!");
-  console.error("Hello, welcome to the server!");
-
 });
 
 // File upload route
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded.' });
+    return res.status(400).send('No file uploaded.');
   }
   res.json({
     message: 'File uploaded successfully!',
     file: req.file
   });
 });
-
 
 // Routes
 app.use('/api', require('./routes/studentRoutes'));
@@ -102,5 +99,4 @@ console.log('AWS Access Key ID:', process.env.AWS_ACCESS_KEY_ID);
 console.log('AWS Secret Access Key:', process.env.AWS_SECRET_ACCESS_KEY);
 console.log('AWS Region:', process.env.AWS_REGION);
 console.log('S3 Bucket:', process.env.S3_BUCKET);
-console.log('Mongodb url:', process.env.MONGODB_URI);
-
+console.log('Mongodb URI:', process.env.MONGODB_URI);
