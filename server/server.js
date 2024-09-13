@@ -82,6 +82,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
 app.use('/api', require('./routes/studentRoutes'));
 app.use('/api', require('./routes/busRoutes'));
 app.use('/api', require('./routes/allocationRoutes'));
+app.use('/api', require('./routes/uploadStops'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
